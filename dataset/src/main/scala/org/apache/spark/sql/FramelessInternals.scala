@@ -17,6 +17,8 @@ object FramelessInternals {
     }
   }
 
+  def expr(column: Column): Expression = column.expr
+
   def logicalPlan(ds: Dataset[_]): LogicalPlan = ds.logicalPlan
 
   def executePlan(ds: Dataset[_], plan: LogicalPlan): QueryExecution = ds.sqlContext.executePlan(plan)

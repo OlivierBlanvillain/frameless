@@ -83,7 +83,7 @@ class TypedDataset[T](
     def applyProduct[K <: HList, Out0 <: HList, Out](groupedBy: K)(
       implicit
       ct: ColumnTypes.Aux[T, K, Out0],
-      toTraversable: ToTraversable.Aux[K, List, UntypedColumn[T]]
+      toTraversable: ToTraversable.Aux[K, List, UntypedExpression[T]]
     ): GroupedByManyOps[T, K, Out0] = new GroupedByManyOps[T, K, Out0](self, groupedBy)
   }
 
@@ -152,7 +152,7 @@ class TypedDataset[T](
     def applyProduct[U <: HList, Out0 <: HList, Out](columns: U)(
       implicit
       ct: ColumnTypes.Aux[T, U, Out0],
-      toTraversable: ToTraversable.Aux[U, List, UntypedColumn[T]],
+      toTraversable: ToTraversable.Aux[U, List, UntypedExpression[T]],
       tupler: Tupler.Aux[Out0, Out],
       encoder: TypedEncoder[Out]
     ): TypedDataset[Out] = {
