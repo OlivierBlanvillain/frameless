@@ -4,7 +4,7 @@ package ops
 import org.apache.spark.sql.Column
 
 import shapeless._
-import shapeless.ops.hlist.{Tupler, ToTraversable, Prepend}
+import shapeless.ops.hlist.{Tupler, ToTraversable, Prepend, Comapped}
 
 class GroupedByManyOps[T, TK <: HList, K <: HList](
   self: TypedDataset[T],
@@ -15,9 +15,11 @@ class GroupedByManyOps[T, TK <: HList, K <: HList](
   toTraversable: ToTraversable.Aux[TK, List, UntypedExpression[T]]
 ) {
 
+  type TypedAggregateT[A] = TypedAggregate[T, A]
+
   def agg[TC <: HList, C <: HList, Out0 <: HList, Out1](columns: TC)(
     implicit
-    tc: AggregateTypes.Aux[T, TC, C],
+    mapped: Comapped.Aux[TC, TypedAggregateT, C],
     encoder: TypedEncoder[Out1],
     append: Prepend.Aux[K, C, Out0],
     toTuple: Tupler.Aux[Out0, Out1],
@@ -48,17 +50,17 @@ class GroupedBy1Ops[K1, V](
   self: TypedDataset[V],
   g1: TypedColumn[V, K1]
 ) {
-  private def underlying = new GroupedByManyOps(self, g1 :: HNil)
+  private val underlying = new GroupedByManyOps(self, g1 :: HNil)
 
-  def agg[U1](c1: TypedAggregate[V, U1])(
+  def agg[U1](c1: underlying.TypedAggregateT[U1])(
     implicit encoder: TypedEncoder[(K1, U1)]
   ): TypedDataset[(K1, U1)] = underlying.agg(c1 :: HNil)
 
-  def agg[U1, U2](c1: TypedAggregate[V, U1], c2: TypedAggregate[V, U2])(
+  def agg[U1, U2](c1: underlying.TypedAggregateT[U1], c2: underlying.TypedAggregateT[U2])(
     implicit encoder: TypedEncoder[(K1, U1, U2)]
   ): TypedDataset[(K1, U1, U2)] = underlying.agg(c1 :: c2 :: HNil)
 
-  def agg[U1, U2, U3](c1: TypedAggregate[V, U1], c2: TypedAggregate[V, U2], c3: TypedAggregate[V, U3])(
+  def agg[U1, U2, U3](c1: underlying.TypedAggregateT[U1], c2: underlying.TypedAggregateT[U2], c3: underlying.TypedAggregateT[U3])(
     implicit encoder: TypedEncoder[(K1, U1, U2, U3)]
   ): TypedDataset[(K1, U1, U2, U3)] = underlying.agg(c1 :: c2 :: c3 :: HNil)
 }
@@ -68,17 +70,17 @@ class GroupedBy2Ops[K1, K2, V](
   g1: TypedColumn[V, K1],
   g2: TypedColumn[V, K2]
 ) {
-  private def underlying = new GroupedByManyOps(self, g1 :: g2 :: HNil)
+  private val underlying = new GroupedByManyOps(self, g1 :: g2 :: HNil)
 
-  def agg[U1](c1: TypedAggregate[V, U1])(
+  def agg[U1](c1: underlying.TypedAggregateT[U1])(
     implicit encoder: TypedEncoder[(K1, K2, U1)]
   ): TypedDataset[(K1, K2, U1)] = underlying.agg(c1 :: HNil)
 
-  def agg[U1, U2](c1: TypedAggregate[V, U1], c2: TypedAggregate[V, U2])(
+  def agg[U1, U2](c1: underlying.TypedAggregateT[U1], c2: underlying.TypedAggregateT[U2])(
     implicit encoder: TypedEncoder[(K1, K2, U1, U2)]
   ): TypedDataset[(K1, K2, U1, U2)] = underlying.agg(c1 :: c2 :: HNil)
 
-  def agg[U1, U2, U3](c1: TypedAggregate[V, U1], c2: TypedAggregate[V, U2], c3: TypedAggregate[V, U3])(
+  def agg[U1, U2, U3](c1: underlying.TypedAggregateT[U1], c2: underlying.TypedAggregateT[U2], c3: underlying.TypedAggregateT[U3])(
     implicit encoder: TypedEncoder[(K1, K2, U1, U2, U3)]
   ): TypedDataset[(K1, K2, U1, U2, U3)] = underlying.agg(c1 :: c2 :: c3 :: HNil)
 }
