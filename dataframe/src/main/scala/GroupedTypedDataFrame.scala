@@ -2,7 +2,7 @@ package frameless
 
 import shapeless._
 import org.apache.spark.sql.{DataFrame, GroupedData}
-import shapeless.ops.hlist.{Prepend, Length, IsHCons, Mapper, LiftAll, Fill}
+import shapeless.ops.hlist.{Prepend, Length, IsHCons, Mapper, LiftAll, Fill, Tupler}
 import shapeless.ops.record.SelectAll
 
 final class GroupedTypedDataFrame[Schema <: Product, GroupingColumns <: HList]
@@ -24,7 +24,7 @@ final class GroupedTypedDataFrame[Schema <: Product, GroupingColumns <: HList]
         n: Length.Aux[C, N],
         f: Fill.Aux[N, Double, F],
         p: Prepend.Aux[S, F, E],
-        t: XLTupler.Aux[E, Out],
+        t: Tupler.Aux[E, Out],
         b: Fields[Out]
       ): TypedDataFrame[Out] =
         new TypedDataFrame(theOp(s(columns)))
@@ -44,7 +44,7 @@ final class GroupedTypedDataFrame[Schema <: Product, GroupingColumns <: HList]
         r: SelectAll.Aux[G, GroupingColumns, S],
         m: Mapper.Aux[ToPreciseNumeric.type, U, O],
         p: Prepend.Aux[S, O, E],
-        t: XLTupler.Aux[E, Out],
+        t: Tupler.Aux[E, Out],
         b: Fields[Out]
       ): TypedDataFrame[Out] =
         new TypedDataFrame(gd.sum(s(columns): _*))
@@ -61,7 +61,7 @@ final class GroupedTypedDataFrame[Schema <: Product, GroupingColumns <: HList]
         e: SelectAll[P, GroupingColumns],
         r: SelectAll.Aux[G, GroupingColumns, S],
         p: Prepend.Aux[S, U, E],
-        t: XLTupler.Aux[E, Out],
+        t: Tupler.Aux[E, Out],
         b: Fields[Out]
       ): TypedDataFrame[Out] =
         new TypedDataFrame(theOp(s(columns)))
@@ -75,7 +75,7 @@ final class GroupedTypedDataFrame[Schema <: Product, GroupingColumns <: HList]
       g: LabelledGeneric.Aux[Schema, G],
       s: SelectAll.Aux[G, GroupingColumns, S],
       p: Prepend.Aux[S, Long :: HNil, P],
-      t: XLTupler.Aux[P, Out],
+      t: Tupler.Aux[P, Out],
       b: Fields[Out]
     ): TypedDataFrame[Out] =
       new TypedDataFrame(gd.count)

@@ -1,7 +1,7 @@
 package frameless
 
 import shapeless._
-import shapeless.ops.hlist.{Length, Fill}
+import shapeless.ops.hlist.{Length, Fill, Tupler}
 import shapeless.ops.traversable.FromTraversable
 import scala.reflect.runtime.universe.TypeTag
 import org.apache.spark.sql.Row
@@ -34,13 +34,13 @@ object TypeableRow extends LowPriorityTypeableRow {
 
   implicit def typeableRowTuple[S <: Product, G <: HList, N <: Nat, F <: HList, T <: Product]
     (implicit
-      t: IsXLTuple[S],
+      t: IsTuple[S],
       g: Generic.Aux[S, G],
       c: TypeTag[G],
       l: Length.Aux[G, N],
       f: Fill.Aux[N, Any, F],
       n: FromTraversable[F],
-      p: XLTupler.Aux[F, T]
+      p: Tupler.Aux[F, T]
     ): Aux[S, G] =
       new TypeableRow[S] {
         type Repr = G

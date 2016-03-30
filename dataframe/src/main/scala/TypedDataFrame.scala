@@ -12,7 +12,7 @@ import scala.util.Random.{nextLong => randomLong}
 
 import shapeless._
 import shapeless.ops.record.Values
-import shapeless.ops.hlist.{IsHCons, Prepend}
+import shapeless.ops.hlist.{IsHCons, Prepend, Tupler}
 
 final class TypedDataFrame[Schema <: Product] private[frameless]
   (_df: DataFrame)
@@ -42,7 +42,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
       r: LabelledGeneric.Aux[OtherS, R],
       P: Prepend.Aux[L, R, P],
       v: Values.Aux[P, V],
-      t: XLTupler.Aux[V, Out],
+      t: Tupler.Aux[V, Out],
       g: Fields[Out]
     ): TypedDataFrame[Out] =
       new TypedDataFrame(df.join(other.df))
@@ -71,7 +71,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
         c: Values.Aux[L, V],
         d: Values.Aux[A, D],
         p: Prepend.Aux[V, D, P],
-        t: XLTupler.Aux[P, Out],
+        t: Tupler.Aux[P, Out],
         g: Fields[Out]
       ): TypedDataFrame[Out] =
         emulateUsing(l(columns), g)
@@ -126,7 +126,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
         c: Values.Aux[L, V],
         d: Values.Aux[R, W],
         p: Prepend.Aux[V, W, P],
-        t: XLTupler.Aux[P, Out],
+        t: Tupler.Aux[P, Out],
         g: Fields[Out]
       ): TypedDataFrame[Out] =
         constructJoinOn(other.df, l(columns), r(otherColumns), joinType)
@@ -189,7 +189,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
       (implicit
         h: IsHCons[C],
         f: FieldsExtractor.Aux[Schema, C, G, S],
-        t: XLTupler.Aux[S, Out],
+        t: Tupler.Aux[S, Out],
         b: Fields[Out]
       ): TypedDataFrame[Out] =
         new TypedDataFrame(df.select(f(columns).map(col): _*))
@@ -255,7 +255,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
       n: Generic.Aux[NewSchema, N],
       t: TypeableRow.Aux[Schema, G],
       p: Prepend.Aux[G, N, P],
-      m: XLTupler.Aux[P, Out],
+      m: Tupler.Aux[P, Out],
       g: Fields[Out]
     ): TypedDataFrame[Out] =
       new TypedDataFrame(df.explode(df.columns.map(col): _*)(r => f(t(r))))
@@ -268,7 +268,7 @@ final class TypedDataFrame[Schema <: Product] private[frameless]
         f: FieldsExtractor.Aux[Schema, C, G, _],
         r: AllRemover.Aux[G, C, R],
         v: Values.Aux[R, V],
-        t: XLTupler.Aux[V, Out],
+        t: Tupler.Aux[V, Out],
         b: Fields[Out]
       ): TypedDataFrame[Out] =
         new TypedDataFrame(f(columns).foldLeft(df)(_ drop _))

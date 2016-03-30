@@ -1,6 +1,7 @@
 package frameless
 
 import shapeless._
+import shapeless.ops.hlist.Tupler
 import shapeless.ops.record.Remover
 
 /** Type class supporting multiple record field removal. */
@@ -27,11 +28,4 @@ object AllRemover {
         type Out = i.Out
         def apply(l: L): Out = i(r(l)._2)
       }
-}
-
-/** Type class witnessing that a type a tuple, up to Tuple64. */
-trait IsXLTuple[T]
-
-object IsXLTuple {
-  implicit def apply[T]: IsXLTuple[T] = macro IsXLTupleMacro.mk[T]
 }
