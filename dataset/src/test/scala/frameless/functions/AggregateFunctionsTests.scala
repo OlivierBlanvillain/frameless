@@ -22,7 +22,7 @@ class AggregateFunctionsTests extends TypedDatasetSuite {
     else falsified :| s"Expected $a but got $b, which is more than 1% off and greater than epsilon = $epsilon."
   }
 
-  def sparkSchema[A: TypedEncoder, U](f: TypedColumn[X1[A], A] => TypedAggregate[X1[A], U]): Prop = {
+  def sparkSchema[A: TypedEncoder, U](f: TypedColumn[A] => TypedAggregate[U]): Prop = {
     val df = TypedDataset.create[X1[A]](Nil)
     val col = f(df.col('a))
 
