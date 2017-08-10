@@ -3,6 +3,7 @@ package frameless
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
 import shapeless.test.illTyped
+import unsafeColmunAccess._
 
 class WidenTests extends TypedDatasetSuite {
 

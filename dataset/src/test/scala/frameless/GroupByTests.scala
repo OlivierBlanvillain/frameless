@@ -3,6 +3,7 @@ package frameless
 import frameless.functions.aggregate._
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class GroupByTests extends TypedDatasetSuite {
   test("groupByMany('a).agg(sum('b))") {

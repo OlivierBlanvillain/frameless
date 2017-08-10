@@ -8,7 +8,7 @@ class NumericTests extends TypedDatasetSuite {
     def prop[A: TypedEncoder: CatalystNumeric: Numeric](a: A, b: A): Prop = {
       val df = TypedDataset.create(X2(a, b) :: Nil)
       val result = implicitly[Numeric[A]].plus(a, b)
-      val got = df.select(df.col('a) + df.col('b)).collect().run()
+      val got = df.select(implicit a => df.col('a) + df.col('b)).collect().run()
 
       got ?= (result :: Nil)
     }
@@ -25,7 +25,7 @@ class NumericTests extends TypedDatasetSuite {
     def prop[A: TypedEncoder: CatalystNumeric: Numeric](a: A, b: A): Prop = {
       val df = TypedDataset.create(X2(a, b) :: Nil)
       val result = implicitly[Numeric[A]].minus(a, b)
-      val got = df.select(df.col('a) - df.col('b)).collect().run()
+      val got = df.select(implicit a => df.col('a) - df.col('b)).collect().run()
 
       got ?= (result :: Nil)
     }
@@ -42,7 +42,7 @@ class NumericTests extends TypedDatasetSuite {
     def prop[A: TypedEncoder: CatalystNumeric: Numeric](a: A, b: A): Prop = {
       val df = TypedDataset.create(X2(a, b) :: Nil)
       val sum = implicitly[Numeric[A]].times(a, b)
-      val got = df.select(df.col('a) * df.col('b)).collect().run()
+      val got = df.select(implicit a => df.col('a) * df.col('b)).collect().run()
 
       got ?= (sum :: Nil)
     }

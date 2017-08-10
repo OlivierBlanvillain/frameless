@@ -4,6 +4,7 @@ import frameless.functions.aggregate._
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
 import org.scalatest.Matchers
+import unsafeColmunAccess._
 
 class SchemaTests extends TypedDatasetSuite with Matchers {
 

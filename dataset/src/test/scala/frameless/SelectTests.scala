@@ -4,8 +4,8 @@ import org.scalacheck.Prop
 import org.scalacheck.Prop._
 import shapeless.test.illTyped
 import frameless.implicits.widen._
-
 import scala.reflect.ClassTag
+import unsafeColmunAccess._
 
 class SelectTests extends TypedDatasetSuite {
   test("select('a) FROM abcd") {

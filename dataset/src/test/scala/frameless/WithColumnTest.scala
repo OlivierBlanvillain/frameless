@@ -2,6 +2,7 @@ package frameless
 
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class WithColumnTest extends TypedDatasetSuite {
   test("append five columns") {

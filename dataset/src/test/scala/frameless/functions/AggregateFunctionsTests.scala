@@ -5,6 +5,7 @@ import frameless.functions.aggregate._
 import org.apache.spark.sql.Encoder
 import org.scalacheck.{Gen, Prop}
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class AggregateFunctionsTests extends TypedDatasetSuite {
 

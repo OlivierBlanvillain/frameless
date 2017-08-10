@@ -2,6 +2,7 @@ package frameless
 
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class FilterTests extends TypedDatasetSuite {
   test("filter('a == lit(b))") {

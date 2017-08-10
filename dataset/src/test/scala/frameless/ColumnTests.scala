@@ -4,6 +4,7 @@ import org.scalacheck.Prop
 import org.scalacheck.Prop._
 
 import scala.math.Ordering.Implicits._
+import unsafeColmunAccess._
 
 class ColumnTests extends TypedDatasetSuite {
 

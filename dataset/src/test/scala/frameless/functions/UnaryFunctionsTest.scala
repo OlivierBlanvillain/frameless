@@ -5,6 +5,7 @@ import org.scalacheck.Prop
 import org.scalacheck.Prop._
 
 import scala.math.Ordering
+import unsafeColmunAccess._
 
 class UnaryFunctionsTest extends TypedDatasetSuite {
   test("size on vector test") {

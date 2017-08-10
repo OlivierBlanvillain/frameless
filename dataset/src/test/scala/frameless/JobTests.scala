@@ -4,7 +4,6 @@ import org.scalacheck.Arbitrary
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatest.prop.GeneratorDrivenPropertyChecks
 
-
 class JobTests extends FreeSpec with SparkTesting with GeneratorDrivenPropertyChecks with Matchers {
 
   "map" - {

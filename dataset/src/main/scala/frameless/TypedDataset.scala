@@ -151,6 +151,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     */
   def apply[A](column: Witness.Lt[Symbol])(
     implicit
+    canAccess: CanAccess[T],
     exists: TypedColumn.Exists[T, column.T, A],
     encoder: TypedEncoder[A]
   ): TypedColumn[A] = col(column)
@@ -165,6 +166,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     */
   def col[A](column: Witness.Lt[Symbol])(
     implicit
+    canAccess: CanAccess[T],
     exists: TypedColumn.Exists[T, column.T, A],
     encoder: TypedEncoder[A]
   ): TypedColumn[A] = {
@@ -175,6 +177,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
   object colMany extends SingletonProductArgs {
     def applyProduct[U <: HList, Out](columns: U)(
       implicit
+      canAccess: CanAccess[T],
       existsAll: TypedColumn.ExistsMany[T, U, Out],
       encoder: TypedEncoder[Out],
       toTraversable: ToTraversable.Aux[U, List, Symbol]
@@ -305,12 +308,12 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
   /** Computes the inner join of `this` `Dataset` with the `other` `Dataset`,
     * returning a `Tuple2` for each pair where condition evaluates to true.
     */
-  def joinInner[U](other: TypedDataset[U])(condition: TypedColumn[Boolean])
+  def joinInner[U](other: TypedDataset[U])(condition: CanAccess[(T, U)] => TypedColumn[Boolean])
     (implicit e: TypedEncoder[(T, U)]): TypedDataset[(T, U)] = {
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = resolveSelfJoin(Join(leftPlan, rightPlan, Inner, Some(condition.expr)))
+      val join = resolveSelfJoin(Join(leftPlan, rightPlan, Inner, Some(condition(CanAccess.theToken).expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
       val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(T, U)])
       TypedDataset.create[(T, U)](joinedDs)
@@ -462,6 +465,15 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
         TypedDataset.create(tuple1.dataset.as[A](TypedExpressionEncoder[A]))
     }
   }
+
+  /** Type-safe projection from type T to Tuple1[A]
+    * {{{
+    *   d.select( d('a), d('a)+d('b), ... )
+    * }}}
+    */
+  def select[A](
+    c: CanAccess[T] => TypedColumn[A]
+  ): TypedDataset[A] = select(c(CanAccess.theToken))
 
   /** Type-safe projection from type T to Tuple2[A,B]
     * {{{

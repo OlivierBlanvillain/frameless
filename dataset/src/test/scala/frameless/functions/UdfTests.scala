@@ -3,6 +3,7 @@ package functions
 
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class UdfTests extends TypedDatasetSuite {
 

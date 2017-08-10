@@ -2,6 +2,7 @@ package frameless
 
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import unsafeColmunAccess._
 
 class JoinTests extends TypedDatasetSuite {
   test("ab.joinRight(ac)(ab.a == ac.a)") {
@@ -43,7 +44,7 @@ class JoinTests extends TypedDatasetSuite {
       val leftDs = TypedDataset.create(left)
       val rightDs = TypedDataset.create(right)
       val joinedDs = leftDs
-        .joinInner(rightDs)(leftDs.col('a) === rightDs.col('a))
+        .joinInner(rightDs)(implicit a => leftDs.col('a) === rightDs.col('a))
         .collect().run().toVector.sorted
 
       val joined = {
@@ -208,7 +209,7 @@ class JoinTests extends TypedDatasetSuite {
 
       val count = ds.dataset.join(ds.dataset, ds.dataset.col("a") === ds.dataset.col("a")).count()
 
-      val countDs = ds.joinInner(ds)(ds.col('a) === ds.col('a))
+      val countDs = ds.joinInner(ds)(implicit a => ds.col('a) === ds.col('a))
         .count().run()
 
       count ?= countDs
