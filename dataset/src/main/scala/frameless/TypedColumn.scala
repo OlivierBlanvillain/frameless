@@ -22,7 +22,9 @@ sealed trait UntypedExpression[T] {
   * at https://github.com/apache/spark, licensed under Apache v2.0 available at
   * http://www.apache.org/licenses/LICENSE-2.0
   *
-  * @tparam T type of dataset
+
+  * @tparam T phantom type representing the dataset on which this columns is
+  *           selected. When `T = A with B` the selection is on either A or B.
   * @tparam U type of column
   */
 sealed class TypedColumn[T, U](
@@ -46,7 +48,7 @@ sealed class TypedColumn[T, U](
 
   private def withExpr(newExpr: Expression): Column = new Column(newExpr)
 
-  private def equalsTo(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = withExpr {
+  private def equalsTo[TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = withExpr {
     if (uencoder.nullable && uencoder.targetDataType.typeName != "struct") EqualNullSafe(self.expr, other.expr)
     else EqualTo(self.expr, other.expr)
   }.typed
@@ -58,7 +60,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def ===(other: U): TypedColumn[T, Boolean] = equalsTo(lit(other))
+  def ===(other: U): TypedColumn[T, Boolean] = equalsTo[T](lit(other))
 
   /** Equality test.
     * {{{
@@ -67,7 +69,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def ===(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = equalsTo(other)
+  def ===[TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = equalsTo[TT](other)
 
   /** Inequality test.
     * {{{
@@ -76,7 +78,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def =!=(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = withExpr {
+  def =!=[TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = withExpr {
     Not(equalsTo(other).expr)
   }.typed
 
@@ -96,7 +98,7 @@ sealed class TypedColumn[T, U](
     * apache/spark
     */
   def isNone(implicit isOption: U <:< Option[_]): TypedColumn[T, Boolean] =
-    equalsTo(lit[U,T](None.asInstanceOf[U]))
+    equalsTo[T](lit[U,T](None.asInstanceOf[U]))
 
   /** True if the current expression is an Option and it's not None.
     *
@@ -114,7 +116,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def plus(other: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] =
+  def plus[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] =
     self.untyped.plus(other.untyped).typed
 
   /** Sum of this expression and another expression.
@@ -125,7 +127,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def +(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] = plus(u)
+  def +[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] = plus[TT](other)
 
   /** Sum of this expression (column) with a constant.
     * {{{
@@ -156,8 +158,8 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def minus(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] =
-    self.untyped.minus(u.untyped).typed
+  def minus[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] =
+    self.untyped.minus(other.untyped).typed
 
   /** Subtraction. Subtract the other expression from this expression.
     * {{{
@@ -167,7 +169,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def -(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] = minus(u)
+  def -[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] = minus[TT](other)
 
   /** Subtraction. Subtract the other expression from this expression.
     * {{{
@@ -188,8 +190,8 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def multiply(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] =
-    self.untyped.multiply(u.untyped).typed
+  def multiply[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] =
+    self.untyped.multiply(other.untyped).typed
 
   /** Multiplication of this expression and another expression.
     * {{{
@@ -199,7 +201,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def *(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, U] = multiply(u)
+  def *[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, U] = multiply[TT](other)
 
   /** Multiplication of this expression a constant.
     * {{{
@@ -211,39 +213,39 @@ sealed class TypedColumn[T, U](
     */
   def *(u: U)(implicit n: CatalystNumeric[U]): TypedColumn[T, U] = self.untyped.multiply(u).typed
 
-  /**
-    * Division this expression by another expression.
+  /** Division this expression by another expression.
     * {{{
     *   // The following divides a person's height by their weight.
     *   people.select( people('height) / people('weight) )
     * }}}
     *
     * @param u another column of the same type
+    *
     * apache/spark
     */
-  def divide(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, Double] =
-    self.untyped.divide(u.untyped).typed
+  def divide[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, Double] =
+    self.untyped.divide(other.untyped).typed
 
-  /**
-    * Division this expression by another expression.
+  /** Division this expression by another expression.
     * {{{
     *   // The following divides a person's height by their weight.
     *   people.select( people('height) / people('weight) )
     * }}}
     *
-    * @param u another column of the same type
+    * @param other another column of the same type
+    *
     * apache/spark
     */
-  def /(u: TypedColumn[T, U])(implicit n: CatalystNumeric[U]): TypedColumn[T, Double] = divide(u)
+  def /[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, Double] = divide[TT](other)
 
-  /**
-    * Division this expression by another expression.
+  /** Division this expression by another expression.
     * {{{
     *   // The following divides a person's height by their weight.
     *   people.select( people('height) / 2 )
     * }}}
     *
     * @param u a constant of the same type
+    *
     * apache/spark
     */
   def /(u: U)(implicit n: CatalystNumeric[U]): TypedColumn[T, Double] = self.untyped.divide(u).typed
@@ -273,8 +275,7 @@ sealed class TypedAggregate[T, U](val expr: Expression)(
 }
 
 object TypedColumn {
-  /**
-    * Evidence that type `T` has column `K` with type `V`.
+  /** Evidence that type `T` has column `K` with type `V`.
     */
   @implicitNotFound(msg = "No column ${K} of type ${V} in ${T}")
   trait Exists[T, K, V]
@@ -309,14 +310,14 @@ object TypedColumn {
   }
 
   implicit class OrderedTypedColumnSyntax[T, U: CatalystOrdered](col: TypedColumn[T, U]) {
-    def <(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = (col.untyped < other.untyped).typed
-    def <=(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = (col.untyped <= other.untyped).typed
-    def >(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = (col.untyped > other.untyped).typed
-    def >=(other: TypedColumn[T, U]): TypedColumn[T, Boolean] = (col.untyped >= other.untyped).typed
+    def <  [TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = (col.untyped <  other.untyped).typed
+    def <= [TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = (col.untyped <= other.untyped).typed
+    def >  [TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = (col.untyped >  other.untyped).typed
+    def >= [TT](other: TypedColumn[TT, U]): TypedColumn[T with TT, Boolean] = (col.untyped >= other.untyped).typed
 
-    def <(other: U): TypedColumn[T, Boolean] = (col.untyped < lit(other)(col.uencoder).untyped).typed
-    def <=(other: U): TypedColumn[T, Boolean] = (col.untyped <= lit(other)(col.uencoder).untyped).typed
-    def >(other: U): TypedColumn[T, Boolean] = (col.untyped > lit(other)(col.uencoder).untyped).typed
-    def >=(other: U): TypedColumn[T, Boolean] = (col.untyped >= lit(other)(col.uencoder).untyped).typed
+    def <  (other: U): TypedColumn[T, Boolean] = (col.untyped <  lit(other)(col.uencoder).untyped).typed
+    def <= (other: U): TypedColumn[T, Boolean] = (col.untyped <= lit(other)(col.uencoder).untyped).typed
+    def >  (other: U): TypedColumn[T, Boolean] = (col.untyped >  lit(other)(col.uencoder).untyped).typed
+    def >= (other: U): TypedColumn[T, Boolean] = (col.untyped >= lit(other)(col.uencoder).untyped).typed
   }
 }
