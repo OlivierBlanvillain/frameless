@@ -223,7 +223,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def divide[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, Double] =
+  def divide[TT, Out: TypedEncoder](other: TypedColumn[TT, U])(implicit n: CatalystDivisible[U, Out]): TypedColumn[T with TT, Out] =
     self.untyped.divide(other.untyped).typed
 
   /** Division this expression by another expression.
@@ -236,7 +236,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def /[TT](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U]): TypedColumn[T with TT, Double] = divide[TT](other)
+  def /[TT, Out](other: TypedColumn[TT, U])(implicit n: CatalystDivisible[U, Out], e: TypedEncoder[Out]): TypedColumn[T with TT, Out] = divide[TT, Out](other)
 
   /** Division this expression by another expression.
     * {{{
