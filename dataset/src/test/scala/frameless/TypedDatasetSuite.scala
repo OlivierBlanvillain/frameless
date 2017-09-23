@@ -43,6 +43,8 @@ class TypedDatasetSuite extends FunSuite with Checkers with BeforeAndAfterAll wi
   implicit override val generatorDrivenConfig =
     PropertyCheckConfiguration(sizeRange = PosZInt(10), minSize = PosZInt(10))
 
+  implicit val sparkDelay: SparkDelay[Job] = Job.framelessSparkDelayForJob
+
   def approximatelyEqual[A](a: A, b: A)(implicit numeric: Numeric[A]): Prop = {
     val da = numeric.toDouble(a)
     val db = numeric.toDouble(b)
