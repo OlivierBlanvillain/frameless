@@ -167,10 +167,8 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     implicit
     exists: TypedColumn.Exists[T, column.T, A],
     encoder: TypedEncoder[A]
-  ): TypedColumn[T, A] = {
-    val colExpr = dataset.col(column.value.name).as[A](TypedExpressionEncoder[A])
-    new TypedColumn[T, A](colExpr)
-  }
+  ): TypedColumn[T, A] =
+    new TypedColumn[T, A](dataset(column.value.name).as[A](TypedExpressionEncoder[A]))
 
   object colMany extends SingletonProductArgs {
     def applyProduct[U <: HList, Out](columns: U)(
@@ -184,6 +182,40 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
 
       new TypedColumn[T, Out](colExpr)
     }
+  }
+
+  /** TODO */
+  def colRight[A](column: Witness.Lt[Symbol])(
+    implicit
+    exists: TypedColumn.Exists[T, column.T, A],
+    encoder: TypedEncoder[A]
+  ): TypedColumn[T, A] = new TypedColumn[T, A](FramelessInternals.DisambiguateRight(col(column).expr))
+
+  object colRightMany extends SingletonProductArgs {
+    def applyProduct[U <: HList, Out](columns: U)(
+      implicit
+      existsAll: TypedColumn.ExistsMany[T, U, Out],
+      encoder: TypedEncoder[Out],
+      toTraversable: ToTraversable.Aux[U, List, Symbol]
+    ): TypedColumn[T, Out] =
+      new TypedColumn[T, Out](FramelessInternals.DisambiguateRight(colRightMany.applyProduct(columns).expr))
+  }
+
+  /** TODO */
+  def colLeft[A](column: Witness.Lt[Symbol])(
+    implicit
+    exists: TypedColumn.Exists[T, column.T, A],
+    encoder: TypedEncoder[A]
+  ): TypedColumn[T, A] = new TypedColumn[T, A](FramelessInternals.DisambiguateLeft(col(column).expr))
+
+  object colLeftMany extends SingletonProductArgs {
+    def applyProduct[U <: HList, Out](columns: U)(
+      implicit
+      existsAll: TypedColumn.ExistsMany[T, U, Out],
+      encoder: TypedEncoder[Out],
+      toTraversable: ToTraversable.Aux[U, List, Symbol]
+    ): TypedColumn[T, Out] =
+      new TypedColumn[T, Out](FramelessInternals.DisambiguateLeft(colRightMany.applyProduct(columns).expr))
   }
 
   /** Returns a `Seq` that contains all the elements in this [[TypedDataset]].
@@ -296,7 +328,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = resolveSelfJoin(Join(leftPlan, rightPlan, Inner, Some(condition.expr)))
+      val join = disambiguate(Join(leftPlan, rightPlan, Inner, Some(condition.expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
       val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(T, U)])
       TypedDataset.create[(T, U)](joinedDs)
@@ -315,7 +347,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = resolveSelfJoin(Join(leftPlan, rightPlan, FullOuter, Some(condition.expr)))
+      val join = disambiguate(Join(leftPlan, rightPlan, FullOuter, Some(condition.expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
       val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(Option[T], Option[U])])
       TypedDataset.create[(Option[T], Option[U])](joinedDs)
@@ -329,7 +361,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = resolveSelfJoin(Join(leftPlan, rightPlan, RightOuter, Some(condition.expr)))
+      val join = disambiguate(Join(leftPlan, rightPlan, RightOuter, Some(condition.expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
       val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(Option[T], U)])
       TypedDataset.create[(Option[T], U)](joinedDs)
@@ -343,7 +375,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = resolveSelfJoin(Join(leftPlan, rightPlan, LeftOuter, Some(condition.expr)))
+      val join = disambiguate(Join(leftPlan, rightPlan, LeftOuter, Some(condition.expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
       val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(T, Option[U])])
 
@@ -365,26 +397,33 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       .as[T](TypedExpressionEncoder(encoder)))
 
   /** Fixes SPARK-6231, for more details see original code in [[Dataset#join]] **/
-  private def resolveSelfJoin(join: Join): Join = {
+  private def disambiguate(join: Join): Join = {
+    val selfJoinFix = spark.sqlContext.getConf("spark.sql.selfJoinAutoResolveAmbiguity", "true").toBoolean
+    if (!selfJoinFix) throw new IllegalStateException("Frameless requires spark.sql.selfJoinAutoResolveAmbiguity to be true")
+    println("YOYO")
+    println(join)
     val plan = FramelessInternals.ofRows(dataset.sparkSession, join).queryExecution.analyzed.asInstanceOf[Join]
-    val hasConflict = plan.left.output.intersect(plan.right.output).nonEmpty
-
-    if (!hasConflict) {
+    println("YOYO1")
+    val conflicts: Seq[Attribute] = plan.left.output.intersect(plan.right.output)
+    println("YOYO2")
+    // conflicts.nonEmpty
+    if (true) {
       val selfJoinFix = spark.sqlContext.getConf("spark.sql.selfJoinAutoResolveAmbiguity", "true").toBoolean
       if (!selfJoinFix) throw new IllegalStateException("Frameless requires spark.sql.selfJoinAutoResolveAmbiguity to be true")
-
       val cond = plan.condition.map(_.transform {
-        case catalyst.expressions.EqualTo(a: AttributeReference, b: AttributeReference)
-          if a.sameRef(b) =>
+        case FramelessInternals.DisambiguateLeft(tagged: AttributeReference) =>
           val leftDs = FramelessInternals.ofRows(spark, plan.left)
+          FramelessInternals.resolveExpr(leftDs, Seq(tagged.name))
+
+        case FramelessInternals.DisambiguateRight(tagged: AttributeReference) =>
           val rightDs = FramelessInternals.ofRows(spark, plan.right)
+          FramelessInternals.resolveExpr(rightDs, Seq(tagged.name))
 
-          catalyst.expressions.EqualTo(
-            FramelessInternals.resolveExpr(leftDs, Seq(a.name)),
-            FramelessInternals.resolveExpr(rightDs, Seq(b.name))
-          )
+        case x =>
+          println()
+          println(x)
+          x
       })
-
       plan.copy(condition = cond)
     } else {
       join
