@@ -10,8 +10,7 @@ import frameless.functions.aggregate._
 import frameless.TypedDataset
 
 val conf = new SparkConf().setMaster("local[*]").setAppName("frameless repl").set("spark.ui.enabled", "false")
-val spark = SparkSession.builder().config(conf).appName("REPL").getOrCreate()
-implicit val sqlContext = spark.sqlContext
+implicit val spark = SparkSession.builder().config(conf).appName("REPL").getOrCreate()
 spark.sparkContext.setLogLevel("WARN")
 
 import spark.implicits._
@@ -22,19 +21,19 @@ import spark.implicits._
 We start by defining a case class:
 
 ```tut:silent
-case class Apartment(city: String, surface: Int, price: Double)
+case class Apartment(city: String, surface: Int, price: Double, bedrooms: Int)
 ```
 
 And few `Apartment` instances:
 
 ```tut:silent
 val apartments = Seq(
-  Apartment("Paris", 50, 300000.0),
-  Apartment("Paris", 100, 450000.0),
-  Apartment("Paris", 25, 250000.0),
-  Apartment("Lyon", 83, 200000.0),
-  Apartment("Lyon", 45, 133000.0),
-  Apartment("Nice", 74, 325000.0)
+  Apartment("Paris", 50,  300000.0, 2),
+  Apartment("Paris", 100, 450000.0, 3),
+  Apartment("Paris", 25,  250000.0, 1),
+  Apartment("Lyon",  83,  200000.0, 2),
+  Apartment("Lyon",  45,  133000.0, 1),
+  Apartment("Nice",  74,  325000.0, 3)
 )
 ```
 
@@ -230,7 +229,7 @@ priceByCity.collect().run()
 ```
 Again if we try to aggregate a column that can't be aggregated, we get a compilation error
 ```tut:book:fail
-aptTypedDs.groupBy(aptTypedDs('city)).agg(avg(aptTypedDs('city)))                                                         ^
+aptTypedDs.groupBy(aptTypedDs('city)).agg(avg(aptTypedDs('city)))                                                        
 ```
 
 Next, we combine `select` and `groupBy` to calculate the average price/surface ratio per city:
@@ -241,6 +240,34 @@ val aptds = aptTypedDs // For shorter expressions
 val cityPriceRatio =  aptds.select(aptds('city), aptds('price) / aptds('surface).cast[Double])
 
 cityPriceRatio.groupBy(cityPriceRatio('_1)).agg(avg(cityPriceRatio('_2))).show().run()
+```
+
+We can also use `pivot` to further group data on a secondary column. 
+For example, we can compare the average price across cities by number of bedrooms.  
+
+```tut:book
+case class BedroomStats(
+   city: String, 
+   AvgPriceBeds1: Option[Double], // Pivot values may be missing, so we encode them using Options
+   AvgPriceBeds2: Option[Double], 
+   AvgPriceBeds3: Option[Double], 
+   AvgPriceBeds4: Option[Double])
+   
+val bedroomStats = aptds.
+   groupBy(aptds('city)).
+   pivot(aptds('bedrooms)).
+   on(1,2,3,4). // We only care for up to 4 bedrooms
+   agg(avg(aptds('price))).
+   as[BedroomStats]  // Typesafe casting
+
+bedroomStats.show().run()
+```
+
+With pivot, collecting data preserves typesafety by 
+encoding potentially missing columns with `Option`.
+
+```tut:book
+bedroomStats.collect().run().foreach(println)
 ```
 
 ### Entire TypedDataset Aggregation

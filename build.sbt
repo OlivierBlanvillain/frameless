@@ -1,7 +1,7 @@
 val sparkVersion = "2.2.0"
-val catsCoreVersion = "1.0.0-MF"
-val catsEffectVersion = "0.4"
-val catsMtlVersion = "0.0.2"
+val catsCoreVersion = "1.0.1"
+val catsEffectVersion = "0.7"
+val catsMtlVersion = "0.2.2"
 val scalatest = "3.0.3"
 val shapeless = "2.3.2"
 val scalacheck = "1.13.5"
@@ -17,6 +17,7 @@ lazy val core = project
   .settings(warnUnusedImport: _*)
   .settings(publishSettings: _*)
 
+
 lazy val cats = project
   .settings(name := "frameless-cats")
   .settings(framelessSettings: _*)
@@ -27,11 +28,12 @@ lazy val cats = project
     scalacOptions += "-Ypartial-unification"
   )
   .settings(libraryDependencies ++= Seq(
-    "org.typelevel"    %% "cats-core"     % catsCoreVersion,
-    "org.typelevel"    %% "cats-effect"   % catsEffectVersion,
-    "org.typelevel"    %% "cats-mtl-core" % catsMtlVersion,
-    "org.apache.spark" %% "spark-core"    % sparkVersion % "provided",
-    "org.apache.spark" %% "spark-sql"     % sparkVersion % "provided"))
+    "org.typelevel"    %% "cats-core"      % catsCoreVersion,
+    "org.typelevel"    %% "cats-effect"    % catsEffectVersion,
+    "org.typelevel"    %% "cats-mtl-core"  % catsMtlVersion,
+    "org.typelevel"    %% "alleycats-core" % catsCoreVersion,
+    "org.apache.spark" %% "spark-core"     % sparkVersion % "provided",
+    "org.apache.spark" %% "spark-sql"      % sparkVersion % "provided"))
   .dependsOn(dataset % "test->test;compile->compile")
 
 lazy val dataset = project
@@ -134,16 +136,16 @@ lazy val framelessTypedDatasetREPL = Seq(
       |import org.apache.spark.{SparkConf, SparkContext}
       |import org.apache.spark.sql.SparkSession
       |import frameless.functions.aggregate._
+      |import frameless.syntax._
       |
       |val conf = new SparkConf().setMaster("local[*]").setAppName("frameless repl").set("spark.ui.enabled", "false")
-      |val spark = SparkSession.builder().config(conf).appName("REPL").getOrCreate()
+      |implicit val spark = SparkSession.builder().config(conf).appName("REPL").getOrCreate()
       |
       |import spark.implicits._
       |
       |spark.sparkContext.setLogLevel("WARN")
       |
       |import frameless.TypedDataset
-      |implicit val sqlContext = spark.sqlContext
     """.stripMargin,
   cleanupCommands in console :=
     """
@@ -152,6 +154,7 @@ lazy val framelessTypedDatasetREPL = Seq(
 )
 
 lazy val publishSettings = Seq(
+  useGpg := true,
   publishMavenStyle := true,
   publishTo := {
     val nexus = "https://oss.sonatype.org/"

@@ -2,6 +2,7 @@ package frameless
 
 import org.scalacheck.Prop
 import org.scalacheck.Prop._
+import scala.reflect.ClassTag
 
 class NumericTests extends TypedDatasetSuite {
   test("plus") {
@@ -39,7 +40,7 @@ class NumericTests extends TypedDatasetSuite {
   }
 
   test("multiply") {
-    def prop[A: TypedEncoder: CatalystNumeric: Numeric](a: A, b: A): Prop = {
+    def prop[A: TypedEncoder : CatalystNumeric : Numeric : ClassTag](a: A, b: A): Prop = {
       val df = TypedDataset.create(X2(a, b) :: Nil)
       val result = implicitly[Numeric[A]].times(a, b)
       val got = df.select(df.col('a) * df.col('b)).collect().run()
@@ -52,21 +53,6 @@ class NumericTests extends TypedDatasetSuite {
     check(prop[Int] _)
     check(prop[Long] _)
     check(prop[Short] _)
-  }
-
-  test("multiply BigDecimal") {
-    def prop(a: BigDecimal, b: BigDecimal): Prop = {
-      val df = TypedDataset.create(X2(a, b) :: Nil)
-      val result = BigDecimal(a.doubleValue * b.doubleValue)
-      val got = df.select(df.col('a) * df.col('b)).collect().run()
-
-      if (got == null :: Nil)
-        proved // https://issues.apache.org/jira/browse/SPARK-22036
-      else
-        approximatelyEqual(got.head, result)
-    }
-
-    check(prop _)
   }
 
   test("divide") {
@@ -97,6 +83,17 @@ class NumericTests extends TypedDatasetSuite {
         val got = df.select(df.col('a) / df.col('b)).collect().run()
         approximatelyEqual(got.head, div)
       }
+    }
+
+    check(prop _)
+  }
+
+  test("multiply BigDecimal") {
+    def prop(a: BigDecimal, b: BigDecimal): Prop = {
+      val df = TypedDataset.create(X2(a, b) :: Nil)
+      val result = BigDecimal(a.doubleValue * b.doubleValue)
+      val got = df.select(df.col('a) * df.col('b)).collect().run()
+      approximatelyEqual(got.head, result)
     }
 
     check(prop _)

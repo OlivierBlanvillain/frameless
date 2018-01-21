@@ -5,12 +5,12 @@
 [![Maven Badge](https://img.shields.io/maven-central/v/org.typelevel/frameless-dataset_2.11.svg)](https://maven-badges.herokuapp.com/maven-central/org.typelevel/frameless-dataset_2.11)
 [![Gitter Badge](https://badges.gitter.im/typelevel/frameless.svg)](https://gitter.im/typelevel/frameless)
 
-Frameless is a proof-of-concept library for working with [Spark](http://spark.apache.org/) using more expressive types.
+Frameless is a Scala library for working with [Spark](http://spark.apache.org/) using more expressive types.
 It consists of the following modules:
 
-* `dataset` for more strongly typed `Dataset`s  (supports Spark 2.0.x)
-* `cats` for using Spark with [cats](https://github.com/typelevel/cats) (supports Cats 0.9.x)
-* `ml` for a more strongly typed use of Spark ML based on `dataset`
+* `dataset` for more strongly typed `Dataset`s  (supports Spark 2.2.x)
+* `cats` for using Spark with [cats](https://github.com/typelevel/cats) (supports Cats 1.0.0-MF)
+* `ml` for a more strongly typed Spark ML API based on `dataset`
 
 The Frameless project and contributors support the
 [Typelevel](http://typelevel.org/) [Code of Conduct](http://typelevel.org/conduct.html) and want all its
@@ -24,7 +24,7 @@ associated channels (e.g. GitHub, Gitter) to be a safe and friendly environment 
 * [Injection: Creating Custom Encoders](http://typelevel.org/frameless/Injection.html)
 * [Job\[A\]](http://typelevel.org/frameless/Job.html)
 * [Using Cats with RDDs](http://typelevel.org/frameless/Cats.html)
-* [TypedDataset support for Spark ML](http://typelevel.org/frameless/TypedML.html)
+* [Typed Spark ML](http://typelevel.org/frameless/TypedML.html)
 * [Proof of Concept: TypedDataFrame](http://typelevel.org/frameless/TypedDataFrame.html)
 
 ## Why?
@@ -47,11 +47,12 @@ To use Frameless in your project add the following in your `build.sbt` file as n
 ```scala
 resolvers += Resolver.sonatypeRepo("releases")
 
-val framelessVersion = "0.3.0"
+val framelessVersion = "0.4.0"
 
 libraryDependencies ++= List(
   "org.typelevel" %% "frameless-cats"      % framelessVersion,
-  "org.typelevel" %% "frameless-dataset"   % framelessVersion
+  "org.typelevel" %% "frameless-dataset"   % framelessVersion,
+  "org.typelevel" %% "frameless-ml"      % framelessVersion
 )
 ```
 

@@ -4,8 +4,10 @@ import frameless.syntax._
 import frameless.functions._
 import org.apache.spark.sql.catalyst.expressions._
 import org.apache.spark.sql.{Column, FramelessInternals}
+import org.apache.spark.sql.types.DecimalType
 import shapeless.ops.record.Selector
 import shapeless._
+import scala.reflect.ClassTag
 import scala.annotation.implicitNotFound
 
 sealed trait UntypedExpression[T] {
@@ -104,6 +106,23 @@ sealed class TypedColumn[T, U](
     Not(equalsTo(lit(None.asInstanceOf[U])).expr)
   }.typed
 
+  /** Convert an Optional column by providing a default value
+    * {{{
+    *   df( df('opt).getOrElse(df('defaultValue)) )
+    * }}}
+    */
+  def getOrElse[Out](default: TypedColumn[T, Out])(implicit isOption: U =:= Option[Out]): TypedColumn[T, Out] = withExpr {
+    Coalesce(Seq(expr, default.expr))
+  }.typed(default.uencoder)
+
+  /** Convert an Optional column by providing a default value
+    * {{{
+    *   df( df('opt).getOrElse(defaultConstant) )
+    * }}}
+    */
+  def getOrElse[Out: TypedEncoder](default: Out)(implicit isOption: U =:= Option[Out]): TypedColumn[T, Out] =
+    getOrElse(lit[Out, T](default))
+
   /** Sum of this expression and another expression.
     * {{{
     *   // The following selects the sum of a person's height and weight.
@@ -186,8 +205,21 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def multiply[TT, W](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U], w: With.Aux[T, TT, W]): TypedColumn[W, U] =
-    self.untyped.multiply(other.untyped).typed
+  def multiply[TT, W]
+    (other: TypedColumn[TT, U])
+    (implicit
+      n: CatalystNumeric[U],
+      w: With.Aux[T, TT, W],
+      c: ClassTag[U]
+    ): TypedColumn[W, U] =
+      if (c.runtimeClass == classOf[BigDecimal]) {
+        // That's apparently the only way to get sound multiplication.
+        // See https://issues.apache.org/jira/browse/SPARK-22036
+        val dt = DecimalType(20, 14)
+        self.untyped.cast(dt).multiply(other.untyped.cast(dt)).typed
+      } else {
+        self.untyped.multiply(other.untyped).typed
+      }
 
   /** Multiplication of this expression and another expression.
     * {{{
@@ -197,7 +229,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def *[TT, W](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U], w: With.Aux[T, TT, W]): TypedColumn[W, U] = multiply[TT, W](other)
+  def *[TT, W](other: TypedColumn[TT, U])(implicit n: CatalystNumeric[U], w: With.Aux[T, TT, W], c: ClassTag[U]): TypedColumn[W, U] = multiply[TT, W](other)
 
   /** Multiplication of this expression a constant.
     * {{{
@@ -215,8 +247,7 @@ sealed class TypedColumn[T, U](
     *   people.select( people('height) / people('weight) )
     * }}}
     *
-    * @param u another column of the same type
-    *
+    * @param other another column of the same type
     * apache/spark
     */
   def divide[TT, Out: TypedEncoder, W](other: TypedColumn[TT, U])(implicit n: CatalystDivisible[U, Out], w: With.Aux[T, TT, W]): TypedColumn[W, Out] =
@@ -232,14 +263,7 @@ sealed class TypedColumn[T, U](
     *
     * apache/spark
     */
-  def /[TT, Out, W]
-    (other: TypedColumn[TT, U])
-    (implicit
-      n: CatalystDivisible[U, Out],
-      e: TypedEncoder[Out],
-      w: With.Aux[T, TT, W]
-    ): TypedColumn[W, Out] =
-      divide[TT, Out, W](other)
+  def /[TT, Out, W](other: TypedColumn[TT, U])(implicit n: CatalystDivisible[U, Out], e: TypedEncoder[Out], w: With.Aux[T, TT, W]): TypedColumn[W, Out] = divide[TT, Out, W](other)
 
   /** Division this expression by another expression.
     * {{{
@@ -253,6 +277,141 @@ sealed class TypedColumn[T, U](
     */
   def /(u: U)(implicit n: CatalystNumeric[U]): TypedColumn[T, Double] = self.untyped.divide(u).typed
 
+  /**
+    * Bitwise AND this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseAND (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseAND(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = self.untyped.bitwiseAND(u).typed
+
+  /**
+    * Bitwise AND this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseAND (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseAND(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] =
+    self.untyped.bitwiseAND(u.untyped).typed
+
+  /**
+    * Bitwise AND this expression and another expression (of same type).
+    * {{{
+    *   df.select(df.col('colA).cast[Int] & -1)
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def &(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseAND(u)
+
+  /**
+    * Bitwise AND this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) & (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def &(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseAND(u)
+
+  /**
+    * Bitwise OR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseOR (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseOR(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = self.untyped.bitwiseOR(u).typed
+
+  /**
+    * Bitwise OR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseOR (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseOR(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] =
+    self.untyped.bitwiseOR(u.untyped).typed
+
+  /**
+    * Bitwise OR this expression and another expression (of same type).
+    * {{{
+    *   df.select(df.col('colA).cast[Long] | 1L)
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def |(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseOR(u)
+
+  /**
+    * Bitwise OR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) | (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def |(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseOR(u)
+
+  /**
+    * Bitwise XOR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseXOR (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseXOR(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = self.untyped.bitwiseXOR(u).typed
+
+  /**
+    * Bitwise XOR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) bitwiseXOR (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def bitwiseXOR(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] =
+    self.untyped.bitwiseXOR(u.untyped).typed
+
+  /**
+    * Bitwise XOR this expression and another expression (of same type).
+    * {{{
+    *   df.select(df.col('colA).cast[Long] ^ 1L)
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def ^(u: U)(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseXOR(u)
+
+  /**
+    * Bitwise XOR this expression and another expression.
+    * {{{
+    *   df.select(df.col('colA) ^ (df.col('colB)))
+    * }}}
+    *
+    * @param u a constant of the same type
+    * apache/spark
+    */
+  def ^(u: TypedColumn[T, U])(implicit n: CatalystBitwise[U]): TypedColumn[T, U] = bitwiseXOR(u)
+
   /** Casts the column to a different type.
     * {{{
     *   df.select(df('a).cast[Int])
@@ -260,6 +419,54 @@ sealed class TypedColumn[T, U](
     */
   def cast[A: TypedEncoder](implicit c: CatalystCast[U, A]): TypedColumn[T, A] =
     self.untyped.cast(TypedEncoder[A].catalystRepr).typed
+
+  /** Contains test.
+    * {{{
+    *   df.filter ( df.col('a).contains("foo") )
+    * }}}
+    */
+  def contains(other: String)(implicit ev: U =:= String): TypedColumn[T, Boolean] =
+    self.untyped.contains(other).typed
+
+  /** Contains test.
+    * {{{
+    *   df.filter ( df.col('a).contains(df.col('b) )
+    * }}}
+    */
+  def contains(other: TypedColumn[T, U])(implicit ev: U =:= String): TypedColumn[T, Boolean] =
+    self.untyped.contains(other.untyped).typed
+
+  /** Boolean AND.
+    * {{{
+    *   df.filter ( (df.col('a) === 1).and(df.col('b) > 5) )
+    * }}}
+    */
+  def and(other: TypedColumn[T, Boolean]): TypedColumn[T, Boolean] =
+    self.untyped.and(other.untyped).typed
+
+  /** Boolean AND.
+    * {{{
+    *   df.filter ( df.col('a) === 1 && df.col('b) > 5)
+    * }}}
+    */
+  def && (other: TypedColumn[T, Boolean]): TypedColumn[T, Boolean] =
+    and(other)
+
+  /** Boolean OR.
+    * {{{
+    *   df.filter ( (df.col('a) === 1).or(df.col('b) > 5) )
+    * }}}
+    */
+  def or(other: TypedColumn[T, Boolean]): TypedColumn[T, Boolean] =
+    self.untyped.or(other.untyped).typed
+
+  /** Boolean OR.
+    * {{{
+    *   df.filter ( df.col('a) === 1 || df.col('b) > 5)
+    * }}}
+    */
+  def || (other: TypedColumn[T, Boolean]): TypedColumn[T, Boolean] =
+    or(other)
 }
 
 /** Expression used in `groupBy`-like constructions.
@@ -272,7 +479,7 @@ sealed class TypedAggregate[T, U](val expr: Expression)(
   val uencoder: TypedEncoder[U]
 ) extends UntypedExpression[T] {
 
-  def this(column: Column)(implicit uenc: TypedEncoder[U]) {
+  def this(column: Column)(implicit e: TypedEncoder[U]) {
     this(FramelessInternals.expr(column))
   }
 }
@@ -287,29 +494,25 @@ object TypedColumn {
   trait ExistsMany[T, K <: HList, V]
 
   object ExistsMany {
-    implicit def deriveCons[T, KH, KT <: HList, V0, V1](
-      implicit
-      head: Exists[T, KH, V0],
-      tail: ExistsMany[V0, KT, V1]
-    ): ExistsMany[T, KH :: KT, V1] = new ExistsMany[T, KH :: KT, V1] {}
+    implicit def deriveCons[T, KH, KT <: HList, V0, V1]
+      (implicit
+        head: Exists[T, KH, V0],
+        tail: ExistsMany[V0, KT, V1]
+      ): ExistsMany[T, KH :: KT, V1] =
+        new ExistsMany[T, KH :: KT, V1] {}
 
-    implicit def deriveHNil[T, K, V](
-      implicit
-      head: Exists[T, K, V]
-    ): ExistsMany[T, K :: HNil, V] = new ExistsMany[T, K :: HNil, V] {}
+    implicit def deriveHNil[T, K, V](implicit head: Exists[T, K, V]): ExistsMany[T, K :: HNil, V] =
+      new ExistsMany[T, K :: HNil, V] {}
   }
 
   object Exists {
-    def apply[T, V](column: Witness)(
-      implicit
-      exists: Exists[T, column.T, V]
-    ): Exists[T, column.T, V] = exists
+    def apply[T, V](column: Witness)(implicit e: Exists[T, column.T, V]): Exists[T, column.T, V] = e
 
-    implicit def deriveRecord[T, H <: HList, K, V](
-      implicit
-      lgen: LabelledGeneric.Aux[T, H],
-      selector: Selector.Aux[H, K, V]
-    ): Exists[T, K, V] = new Exists[T, K, V] {}
+    implicit def deriveRecord[T, H <: HList, K, V]
+      (implicit
+        i0: LabelledGeneric.Aux[T, H],
+        i1: Selector.Aux[H, K, V]
+      ): Exists[T, K, V] = new Exists[T, K, V] {}
   }
 
   implicit class OrderedTypedColumnSyntax[T, U: CatalystOrdered](col: TypedColumn[T, U]) {

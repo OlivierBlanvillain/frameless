@@ -5,7 +5,7 @@ import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
 
 val conf = new SparkConf().setMaster("local[*]").setAppName("test").set("spark.ui.enabled", "false").set("spark.app.id", "tut-dataset")
-val spark = SparkSession.builder().config(conf).getOrCreate()
+implicit val spark = SparkSession.builder().config(conf).getOrCreate()
 
 System.clearProperty("spark.master.port")
 System.clearProperty("spark.driver.port")
@@ -77,7 +77,7 @@ a non existing column `x`:
 ds.filter($"i" === 10).select($"x".as[Long])
 ```
 
-There are two things to improve here. First, we would want to avoid the `at[Long]` casting that we are required
+There are two things to improve here. First, we would want to avoid the `as[Long]` casting that we are required
 to type for type-safety. This is clearly an area where we can introduce a bug by casting to an incompatible
 type. Second, we want a solution where reference to a
 non existing column name fails at compilation time.
