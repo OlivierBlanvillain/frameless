@@ -334,10 +334,13 @@ object TypedColumn {
 }
 
 /** Compute the intersection of two types:
-  * - With[A, B] = A with B (for A != B)
+  *
   * - With[A, A] = A
-  * This is here to prevent IDE from infering `A with A with ... with A`.
-  * These types could be confusing for both end users and IDE's type checkers.
+  * - With[A, B] = A with B (when A != B)
+  *
+  * This type function is needed to prevent IDEs from infering large types
+  * with shape `A with A with ... with A`. These types could be confusing for
+  * both end users and IDE's type checkers.
   */
 trait With[A, B] { type Out }
 

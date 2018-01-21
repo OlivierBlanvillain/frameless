@@ -184,7 +184,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     }
   }
 
-  /** TODO */
+  /** TODOC */
   def colRight[A](column: Witness.Lt[Symbol])(
     implicit
     exists: TypedColumn.Exists[T, column.T, A],
@@ -201,7 +201,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       new TypedColumn[T, Out](FramelessInternals.DisambiguateRight(colRightMany.applyProduct(columns).expr))
   }
 
-  /** TODO */
+  /** TODOC */
   def colLeft[A](column: Witness.Lt[Symbol])(
     implicit
     exists: TypedColumn.Exists[T, column.T, A],
@@ -320,20 +320,6 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     ): GroupedByManyOps[T, TK, K, KT] = new GroupedByManyOps[T, TK, K, KT](self, groupedBy)
   }
 
-  /** Computes the inner join of `this` `Dataset` with the `other` `Dataset`,
-    * returning a `Tuple2` for each pair where condition evaluates to true.
-    */
-  def joinInner[U](other: TypedDataset[U])(condition: TypedColumn[T with U, Boolean])
-    (implicit e: TypedEncoder[(T, U)]): TypedDataset[(T, U)] = {
-      import FramelessInternals._
-      val leftPlan = logicalPlan(dataset)
-      val rightPlan = logicalPlan(other.dataset)
-      val join = disambiguate(Join(leftPlan, rightPlan, Inner, Some(condition.expr)))
-      val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
-      val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(T, U)])
-      TypedDataset.create[(T, U)](joinedDs)
-    }
-
   /** Computes the cartesian project of `this` `Dataset` with the `other` `Dataset` */
   def joinCross[U](other: TypedDataset[U])
     (implicit e: TypedEncoder[(T, U)]): TypedDataset[(T, U)] =
@@ -353,18 +339,18 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       TypedDataset.create[(Option[T], Option[U])](joinedDs)
     }
 
-  /** Computes the right outer join of `this` `Dataset` with the `other` `Dataset`,
+  /** Computes the inner join of `this` `Dataset` with the `other` `Dataset`,
     * returning a `Tuple2` for each pair where condition evaluates to true.
     */
-  def joinRight[U](other: TypedDataset[U])(condition: TypedColumn[T with U, Boolean])
-    (implicit e: TypedEncoder[(Option[T], U)]): TypedDataset[(Option[T], U)] = {
+  def joinInner[U](other: TypedDataset[U])(condition: TypedColumn[T with U, Boolean])
+    (implicit e: TypedEncoder[(T, U)]): TypedDataset[(T, U)] = {
       import FramelessInternals._
       val leftPlan = logicalPlan(dataset)
       val rightPlan = logicalPlan(other.dataset)
-      val join = disambiguate(Join(leftPlan, rightPlan, RightOuter, Some(condition.expr)))
+      val join = disambiguate(Join(leftPlan, rightPlan, Inner, Some(condition.expr)))
       val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
-      val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(Option[T], U)])
-      TypedDataset.create[(Option[T], U)](joinedDs)
+      val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(T, U)])
+      TypedDataset.create[(T, U)](joinedDs)
     }
 
   /** Computes the left outer join of `this` `Dataset` with the `other` `Dataset`,
@@ -395,6 +381,20 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
   def joinLeftAnti[U](other: TypedDataset[U])(condition: TypedColumn[T with U, Boolean]): TypedDataset[T] =
     new TypedDataset(self.dataset.join(other.dataset, condition.untyped, "leftanti")
       .as[T](TypedExpressionEncoder(encoder)))
+
+  /** Computes the right outer join of `this` `Dataset` with the `other` `Dataset`,
+    * returning a `Tuple2` for each pair where condition evaluates to true.
+    */
+  def joinRight[U](other: TypedDataset[U])(condition: TypedColumn[T with U, Boolean])
+    (implicit e: TypedEncoder[(Option[T], U)]): TypedDataset[(Option[T], U)] = {
+      import FramelessInternals._
+      val leftPlan = logicalPlan(dataset)
+      val rightPlan = logicalPlan(other.dataset)
+      val join = disambiguate(Join(leftPlan, rightPlan, RightOuter, Some(condition.expr)))
+      val joinedPlan = joinPlan(dataset, join, leftPlan, rightPlan)
+      val joinedDs = mkDataset(dataset.sqlContext, joinedPlan, TypedExpressionEncoder[(Option[T], U)])
+      TypedDataset.create[(Option[T], U)](joinedDs)
+    }
 
   /** Fixes SPARK-6231, for more details see original code in [[Dataset#join]] **/
   private def disambiguate(join: Join): Join = {

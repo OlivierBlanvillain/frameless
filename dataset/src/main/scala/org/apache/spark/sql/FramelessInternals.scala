@@ -51,7 +51,7 @@ object FramelessInternals {
   // because org.apache.spark.sql.types.UserDefinedType is private[spark]
   type UserDefinedType[A >: Null] =  org.apache.spark.sql.types.UserDefinedType[A]
 
-  /** Expression to tag columns from the left hand side of a slef join expression. */
+  /** Expression to tag columns from the left hand side of join expression. */
   case class DisambiguateLeft[T](tagged: Expression) extends Expression with NonSQLExpression {
     def eval(input: InternalRow): Any = tagged.eval(input)
     def nullable: Boolean = false
@@ -61,7 +61,7 @@ object FramelessInternals {
     override def genCode(ctx: CodegenContext): ExprCode = tagged.genCode(ctx)
   }
 
-  /** Expression to tag columns from the right hand side of a slef join expression. */
+  /** Expression to tag columns from the right hand side of join expression. */
   case class DisambiguateRight[T](tagged: Expression) extends Expression with NonSQLExpression {
     def eval(input: InternalRow): Any = tagged.eval(input)
     def nullable: Boolean = false
