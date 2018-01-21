@@ -7,7 +7,7 @@ import org.apache.spark.sql.{SparkSession, functions => sqlf}
 class SelfJoinTests extends TypedDatasetSuite {
   // Without crossJoin.enabled=true Spark doesn't like trivial join conditions:
   // [error] Join condition is missing or trivial.
-  // [error] Use the CROSS JOIN syntax to allow cartesian products between these relations.;
+  // [error] Use the CROSS JOIN syntax to allow cartesian products between these relations.
   def allowTrivialJoin[T](body: => T)(implicit session: SparkSession): T = {
     val crossJoin = "spark.sql.crossJoin.enabled"
     val oldSetting = session.conf.get(crossJoin)

@@ -122,8 +122,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
     TypedDataset.create(dataset.as[U](TypedExpressionEncoder[U]))
   }
 
-  /**
-    * Returns a checkpointed version of this [[TypedDataset]]. Checkpointing can be used to truncate the
+  /** Returns a checkpointed version of this [[TypedDataset]]. Checkpointing can be used to truncate the
     * logical plan of this Dataset, which is especially useful in iterative algorithms where the
     * plan may grow exponentially. It will be saved to files inside the checkpoint
     * directory set with `SparkContext#setCheckpointDir`.
@@ -202,7 +201,12 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       }
   }
 
-  /** TODOC */
+  /** Right hand side disambiguation of `col` for join expressions.
+    * To be used  when writting self-joins, noop in other circonstances.
+    *
+    * Note: In vanilla Spark, disambiguation in self-joins is acheaved using
+    * String based aliases, which is obviously unsafe.
+    */
   def colRight[A](column: Witness.Lt[Symbol])(
     implicit
     exists: TypedColumn.Exists[T, column.T, A],
@@ -219,7 +223,12 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       new TypedColumn[T, Out](FramelessInternals.DisambiguateRight(colRightMany.applyProduct(columns).expr))
   }
 
-  /** TODOC */
+  /** Left hand side disambiguation of `col` for join expressions.
+    * To be used  when writting self-joins, noop in other circonstances.
+    *
+    * Note: In vanilla Spark, disambiguation in self-joins is acheaved using
+    * String based aliases, which is obviously unsafe.
+    */
   def colLeft[A](column: Witness.Lt[Symbol])(
     implicit
     exists: TypedColumn.Exists[T, column.T, A],
@@ -271,8 +280,7 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
   def take[F[_]](num: Int)(implicit F: SparkDelay[F]): F[Seq[T]] =
     F.delay(dataset.take(num))
 
-  /**
-    * Return an iterator that contains all rows in this [[TypedDataset]].
+  /** Return an iterator that contains all rows in this [[TypedDataset]].
     *
     * The iterator will consume as much memory as the largest partition in this [[TypedDataset]].
     *
@@ -430,38 +438,20 @@ class TypedDataset[T] protected[frameless](val dataset: Dataset[T])(implicit val
       TypedDataset.create[(Option[T], U)](joinedDs)
     }
 
-  /** Fixes SPARK-6231, for more details see original code in [[Dataset#join]] **/
   private def disambiguate(join: Join): Join = {
-    val selfJoinFix = spark.sqlContext.getConf("spark.sql.selfJoinAutoResolveAmbiguity", "true").toBoolean
-    if (!selfJoinFix) throw new IllegalStateException("Frameless requires spark.sql.selfJoinAutoResolveAmbiguity to be true")
-    println("YOYO")
-    println(join)
     val plan = FramelessInternals.ofRows(dataset.sparkSession, join).queryExecution.analyzed.asInstanceOf[Join]
-    println("YOYO1")
-    val conflicts: Seq[Attribute] = plan.left.output.intersect(plan.right.output)
-    println("YOYO2")
-    // conflicts.nonEmpty
-    if (true) {
-      val selfJoinFix = spark.sqlContext.getConf("spark.sql.selfJoinAutoResolveAmbiguity", "true").toBoolean
-      if (!selfJoinFix) throw new IllegalStateException("Frameless requires spark.sql.selfJoinAutoResolveAmbiguity to be true")
-      val cond = plan.condition.map(_.transform {
-        case FramelessInternals.DisambiguateLeft(tagged: AttributeReference) =>
-          val leftDs = FramelessInternals.ofRows(spark, plan.left)
-          FramelessInternals.resolveExpr(leftDs, Seq(tagged.name))
+    val disambiguated = plan.condition.map(_.transform {
+      case FramelessInternals.DisambiguateLeft(tagged: AttributeReference) =>
+        val leftDs = FramelessInternals.ofRows(spark, plan.left)
+        FramelessInternals.resolveExpr(leftDs, Seq(tagged.name))
 
-        case FramelessInternals.DisambiguateRight(tagged: AttributeReference) =>
-          val rightDs = FramelessInternals.ofRows(spark, plan.right)
-          FramelessInternals.resolveExpr(rightDs, Seq(tagged.name))
+      case FramelessInternals.DisambiguateRight(tagged: AttributeReference) =>
+        val rightDs = FramelessInternals.ofRows(spark, plan.right)
+        FramelessInternals.resolveExpr(rightDs, Seq(tagged.name))
 
-        case x =>
-          println()
-          println(x)
-          x
-      })
-      plan.copy(condition = cond)
-    } else {
-      join
-    }
+      case x => x
+    })
+    plan.copy(condition = disambiguated)
   }
 
   /** Takes a function from A => R and converts it to a UDF for TypedColumn[T, A] => TypedColumn[T, R].
