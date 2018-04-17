@@ -26,6 +26,10 @@ abstract class TypedEncoder[T](implicit val classTag: ClassTag[T]) extends Seria
   /** T to Catalyst representation
     */
   def toCatalyst(path: Expression): Expression
+
+  def lol = false
+  def lel: org.apache.spark.sql.catalyst.encoders.ExpressionEncoder[T] = null
+  def TT: T = ???
 }
 
 // Waiting on scala 2.12
@@ -221,7 +225,7 @@ object TypedEncoder {
 
       def catalystRepr: DataType = encodeT.jvmRepr match {
         case ByteType => BinaryType
-        case _        => ArrayType(encodeT.catalystRepr, encodeT.nullable)
+        case _        => ArrayType(encodeT.catalystRepr, true)
       }
 
       def toCatalyst(path: Expression): Expression =
@@ -231,7 +235,7 @@ object TypedEncoder {
 
           case ByteType => path
 
-          case otherwise => MapObjects(encodeT.toCatalyst, path, encodeT.jvmRepr, encodeT.nullable)
+          case otherwise => MapObjects(encodeT.toCatalyst, path, encodeT.jvmRepr, true)
         }
 
       def fromCatalyst(path: Expression): Expression =
@@ -246,7 +250,7 @@ object TypedEncoder {
           case ByteType => path
 
           case otherwise =>
-            Invoke(MapObjects(encodeT.fromCatalyst, path, encodeT.catalystRepr, encodeT.nullable), "array", jvmRepr)
+            Invoke(MapObjects(encodeT.fromCatalyst, path, encodeT.catalystRepr, true), "array", jvmRepr)
         }
     }
 
@@ -260,19 +264,19 @@ object TypedEncoder {
 
         def jvmRepr: DataType = FramelessInternals.objectTypeFor[C[T]](CT)
 
-        def catalystRepr: DataType = ArrayType(encodeT.catalystRepr, encodeT.nullable)
+        def catalystRepr: DataType = ArrayType(encodeT.catalystRepr, true)
 
         def toCatalyst(path: Expression): Expression =
           if (ScalaReflection.isNativeType(encodeT.jvmRepr))
             NewInstance(classOf[GenericArrayData], path :: Nil, catalystRepr)
-          else MapObjects(encodeT.toCatalyst, path, encodeT.jvmRepr, encodeT.nullable)
+          else MapObjects(encodeT.toCatalyst, path, encodeT.jvmRepr, true)
 
         def fromCatalyst(path: Expression): Expression =
           MapObjects(
             encodeT.fromCatalyst,
             path,
             encodeT.catalystRepr,
-            encodeT.nullable,
+            true,
             Some(CT.runtimeClass) // This will cause MapObjects to build a collection of type C[_] directly
           )
       }
@@ -286,7 +290,7 @@ object TypedEncoder {
 
       def jvmRepr: DataType = FramelessInternals.objectTypeFor[Map[A, B]]
 
-      def catalystRepr: DataType = MapType(encodeA.catalystRepr, encodeB.catalystRepr, encodeB.nullable)
+      def catalystRepr: DataType = MapType(encodeA.catalystRepr, encodeB.catalystRepr, true)
 
       def fromCatalyst(path: Expression): Expression = {
         val keyArrayType = ArrayType(encodeA.catalystRepr, containsNull = false)
@@ -300,7 +304,7 @@ object TypedEncoder {
           FramelessInternals.objectTypeFor[Array[Any]]
         )
 
-        val valueArrayType = ArrayType(encodeB.catalystRepr, encodeB.nullable)
+        val valueArrayType = ArrayType(encodeB.catalystRepr, true)
         val valueData = Invoke(
           MapObjects(
             encodeB.fromCatalyst,
@@ -322,10 +326,10 @@ object TypedEncoder {
         path,
         encodeA.jvmRepr,
         encodeA.toCatalyst,
-        encodeA.nullable,
+        true,
         encodeB.jvmRepr,
         encodeB.toCatalyst,
-        encodeB.nullable)
+        true)
     }
 
   implicit def optionEncoder[A](implicit underlying: TypedEncoder[A]): TypedEncoder[Option[A]] =

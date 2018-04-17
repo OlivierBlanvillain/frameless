@@ -3,7 +3,7 @@ package frameless
 import org.apache.spark.sql.FramelessInternals
 import org.apache.spark.sql.catalyst.analysis.GetColumnByOrdinal
 import org.apache.spark.sql.catalyst.expressions._
-import org.apache.spark.sql.catalyst.expressions.objects.{Invoke, NewInstance}
+import org.apache.spark.sql.catalyst.expressions.objects._
 import org.apache.spark.sql.types._
 import shapeless._
 import shapeless.labelled.FieldType
@@ -132,7 +132,7 @@ class RecordEncoder[F, G <: HList, H <: HList]
         StructField(
           name = field.name,
           dataType = field.encoder.catalystRepr,
-          nullable = field.encoder.nullable,
+          nullable = true,
           metadata = Metadata.empty
         )
       }
@@ -146,7 +146,7 @@ class RecordEncoder[F, G <: HList, H <: HList]
       }
 
       val valueExprs = fields.value.value.map { field =>
-        val fieldPath = Invoke(path, field.name, field.encoder.jvmRepr, Nil)
+        val fieldPath = Invoke(AssertNotNull(AssertNotNull(path)), field.name, field.encoder.jvmRepr, Nil)
         field.encoder.toCatalyst(fieldPath)
       }
 
@@ -155,18 +155,19 @@ class RecordEncoder[F, G <: HList, H <: HList]
         case (nameExpr, valueExpr) => nameExpr :: valueExpr :: Nil
       }
 
-      val nullExpr = Literal.create(null, catalystRepr)
+      // val nullExpr = Literal.create(null, catalystRepr)
       val createExpr = CreateNamedStruct(exprs)
-      If(IsNull(path), nullExpr, createExpr)
+      createExpr
+      // If(IsNull(path), nullExpr, createExpr)
     }
 
     def fromCatalyst(path: Expression): Expression = {
       val exprs = fields.value.value.map { field =>
         val fieldPath = path match {
-          case BoundReference(ordinal, dataType, nullable) =>
-            GetColumnByOrdinal(field.ordinal, field.encoder.jvmRepr)
+          // case BoundReference(ordinal, dataType, _) =>
           case other =>
-            GetStructField(path, field.ordinal, Some(field.name))
+            GetColumnByOrdinal(field.ordinal, field.encoder.jvmRepr)
+            // GetStructField(path, field.ordinal, Some(field.name))
         }
         field.encoder.fromCatalyst(fieldPath)
       }
@@ -174,6 +175,7 @@ class RecordEncoder[F, G <: HList, H <: HList]
       val nullExpr = Literal.create(null, jvmRepr)
       val newArgs = newInstanceExprs.value.from(exprs)
       val newExpr = NewInstance(classTag.runtimeClass, newArgs, jvmRepr, propagateNull = true)
-      If(IsNull(path), nullExpr, newExpr)
+      newExpr
+      // If(IsNull(path), nullExpr, newExpr)
     }
 }

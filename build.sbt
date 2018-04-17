@@ -17,7 +17,6 @@ lazy val core = project
   .settings(warnUnusedImport: _*)
   .settings(publishSettings: _*)
 
-
 lazy val cats = project
   .settings(name := "frameless-cats")
   .settings(framelessSettings: _*)
@@ -90,13 +89,13 @@ lazy val framelessSettings = Seq(
     "com.chuusai" %% "shapeless" % shapeless,
     "org.scalatest" %% "scalatest" % scalatest % "test",
     "org.scalacheck" %% "scalacheck" % scalacheck % "test"),
-  javaOptions in Test ++= Seq("-Xmx1G"),
+  javaOptions in Test ++= Seq("-Xmx1G", "-ea"),
   fork in Test := true,
   parallelExecution in Test := false
 )
 
 lazy val commonScalacOptions = Seq(
-  "-target:jvm-1.8", 
+  "-target:jvm-1.8",
   "-deprecation",
   "-encoding", "UTF-8",
   "-feature",
@@ -120,7 +119,8 @@ lazy val warnUnusedImport = Seq(
       case Some((2, 10)) =>
         Seq()
       case Some((2, n)) if n >= 11 =>
-        Seq("-Ywarn-unused-import")
+        Seq()
+        // Seq("-Ywarn-unused-import")
     }
   },
   scalacOptions in (Compile, console) ~= {_.filterNot("-Ywarn-unused-import" == _)},
